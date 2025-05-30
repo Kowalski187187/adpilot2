@@ -57,11 +57,23 @@ services:
       dockerfile: Dockerfile
     container_name: adpilot_frontend
     ports:
-      - "3000:3000"
+      - "3000:80"
     environment:
       - REACT_APP_API_BASE_URL=http://localhost:4000/api
     depends_on:
       - orchestrator
+
+  meta-ads:
+    build:
+      context: ./adpilot2/services/meta-ads
+      dockerfile: Dockerfile
+    container_name: adpilot_meta_ads
+    ports:
+      - "5001:5001"
+    env_file:
+      - ./adpilot2/.env.meta-ads
+    depends_on:
+      - mongo
 
 volumes:
   mongo_data:
