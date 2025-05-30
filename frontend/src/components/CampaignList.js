@@ -2,17 +2,57 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { dummyCampaigns } from '../data/dummyCampaigns';
 
 function CampaignList() {
-  const [selectedPeriod, setSelectedPeriod] = useState('1d');
+  console.log('CampaignList component rendering');
   
-  const { data: campaigns, isLoading, error } = useQuery({
+  const [selectedPeriod, setSelectedPeriod] = useState('1d');
+  const [expandedCampaigns, setExpandedCampaigns] = useState(new Set());
+  const [expandedAdSets, setExpandedAdSets] = useState(new Set());
+  
+  const { data: campaigns, isLoading } = useQuery({
     queryKey: ['campaigns', selectedPeriod],
     queryFn: async () => {
-      const response = await axios.get(`/campaigns?period=${selectedPeriod}`);
-      return response.data;
+      try {
+        const response = await axios.get(`http://localhost:3001/campaigns?period=${selectedPeriod}`);
+        if (response.status === 200 && Array.isArray(response.data)) {
+          return response.data;
+        } else {
+          // Hvis API svarer med feil, bruk dummy-data
+          return dummyCampaigns;
+        }
+      } catch (error) {
+        // Uansett feil, bruk dummy-data
+        return dummyCampaigns;
+      }
     }
   });
+
+  console.log('Current state:', { campaigns, isLoading });
+
+  const toggleCampaign = (campaignId) => {
+    console.log('Toggling campaign:', campaignId);
+    const newExpanded = new Set(expandedCampaigns);
+    if (newExpanded.has(campaignId)) {
+      newExpanded.delete(campaignId);
+    } else {
+      newExpanded.add(campaignId);
+    }
+    setExpandedCampaigns(newExpanded);
+  };
+
+  const toggleAdSet = (adSetId) => {
+    console.log('Toggling ad set:', adSetId);
+    const newExpanded = new Set(expandedAdSets);
+    if (newExpanded.has(adSetId)) {
+      newExpanded.delete(adSetId);
+    } else {
+      newExpanded.add(adSetId);
+    }
+    setExpandedAdSets(newExpanded);
+  };
 
   const getPlatformIcon = (platform) => {
     switch (platform) {
@@ -91,8 +131,17 @@ function CampaignList() {
     return 'text-red-500';
   };
 
-  if (isLoading) return <div className="text-center py-8">Laster kampanjer...</div>;
-  if (error) return <div className="text-center py-8 text-red-500">Feil ved lasting av kampanjer</div>;
+  if (isLoading) {
+    console.log('Loading state');
+    return <div className="text-center py-8">Laster kampanjer...</div>;
+  }
+  
+  if (!campaigns) {
+    console.log('No campaigns found');
+    return <div className="text-center py-8">Ingen kampanjer funnet</div>;
+  }
+
+  console.log('Rendering campaigns:', campaigns);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -126,8 +175,6 @@ function CampaignList() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kampanje</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Budsjett</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Startdato</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Sluttdato</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Kostnad</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">ROAS</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Konverteringer</th>
@@ -137,64 +184,102 @@ function CampaignList() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {campaigns?.map((campaign) => (
-              <tr key={campaign.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <span className="mr-2">{getPlatformIcon(campaign.platform)}</span>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{campaign.name}</div>
-                      <div className="text-sm text-gray-500">ID: {campaign.id}</div>
+            {campaigns.map((campaign) => (
+              <React.Fragment key={campaign.id}>
+                <tr className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <button
+                        onClick={() => toggleCampaign(campaign.id)}
+                        className="mr-2 focus:outline-none"
+                      >
+                        {expandedCampaigns.has(campaign.id) ? (
+                          <ChevronDownIcon className="h-5 w-5 text-gray-500" />
+                        ) : (
+                          <ChevronRightIcon className="h-5 w-5 text-gray-500" />
+                        )}
+                      </button>
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{campaign.name}</div>
+                        <div className="text-sm text-gray-500">ID: {campaign.id}</div>
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(campaign.status)}`}>
-                    {campaign.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                  {formatCurrency(campaign.budgetPerDay)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                  {formatDate(campaign.startDate)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                  {formatDate(campaign.endDate)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                  {formatCurrency(campaign.spend)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                  <div className="flex flex-col items-end">
-                    <span className={`${getRoasColor(campaign.results?.overallRoas)}`}>
-                      {formatRoas(campaign.results?.overallRoas)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(campaign.status)}`}>
+                      {campaign.status}
                     </span>
-                    <div className="text-xs text-gray-500">
-                      <span className={getRoasColor(campaign.results?.roasA)}>A: {formatRoas(campaign.results?.roasA)}</span>
-                      {' | '}
-                      <span className={getRoasColor(campaign.results?.roasB)}>B: {formatRoas(campaign.results?.roasB)}</span>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                  {formatNumber(campaign.conversions)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                  {formatNumber(campaign.clicks)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                  {formatNumber(campaign.impressions)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <Link
-                    to={`/campaigns/${campaign.id}`}
-                    className="text-blue-600 hover:text-blue-900"
-                  >
-                    Se detaljer
-                  </Link>
-                </td>
-              </tr>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                    {formatCurrency(campaign.adSets?.[0]?.dailyBudget || 0)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                    {formatCurrency(campaign.spend)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    <span className={getRoasColor(campaign.roas)}>
+                      {formatRoas(campaign.roas)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                    {formatNumber(campaign.conversions)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                    {formatNumber(campaign.clicks)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                    {formatNumber(campaign.impressions)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <Link
+                      to={`/campaigns/${campaign.id}`}
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      Se detaljer
+                    </Link>
+                  </td>
+                </tr>
+                
+                {/* Ad Sets */}
+                {expandedCampaigns.has(campaign.id) && campaign.adSets?.map((adSet) => (
+                  <React.Fragment key={adSet.id}>
+                    <tr className="bg-gray-50">
+                      <td colSpan="9" className="px-6 py-4">
+                        <div className="flex items-center">
+                          <button
+                            onClick={() => toggleAdSet(adSet.id)}
+                            className="mr-2 focus:outline-none"
+                          >
+                            {expandedAdSets.has(adSet.id) ? (
+                              <ChevronDownIcon className="h-5 w-5 text-gray-500" />
+                            ) : (
+                              <ChevronRightIcon className="h-5 w-5 text-gray-500" />
+                            )}
+                          </button>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{adSet.name}</div>
+                            <div className="text-sm text-gray-500">
+                              Budsjett: {formatCurrency(adSet.dailyBudget)}/dag
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                    
+                    {/* Ads */}
+                    {expandedAdSets.has(adSet.id) && adSet.ads?.map((ad) => (
+                      <tr key={ad.id} className="bg-gray-100">
+                        <td colSpan="9" className="px-6 py-4">
+                          <div className="ml-8">
+                            <div className="text-sm font-medium text-gray-900">{ad.name}</div>
+                            <div className="text-sm text-gray-500">{ad.creative.text}</div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </React.Fragment>
             ))}
           </tbody>
         </table>

@@ -85,6 +85,32 @@ cron.schedule('*/15 * * * *', async () => {
   }
 });
 
+// Cron-jobb: Oppdater alle kampanjer fra Meta hvert 5. minutt
+cron.schedule('*/5 * * * *', async () => {
+  try {
+    const campaigns = await require('./models/Campaign').find({});
+    for (const campaign of campaigns) {
+      await testEngine.collectStats(campaign._id);
+    }
+    console.log('Oppdaterte kampanjedata fra Meta');
+  } catch (error) {
+    console.error('Feil ved oppdatering av kampanjedata:', error);
+  }
+});
+
+// Endepunkt for manuell oppdatering fra dashboardet
+app.post('/campaigns/update', async (req, res) => {
+  try {
+    const campaigns = await require('./models/Campaign').find({});
+    for (const campaign of campaigns) {
+      await testEngine.collectStats(campaign._id);
+    }
+    res.json({ message: 'Kampanjedata oppdatert fra Meta' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Start server
 app.listen(port, () => {
   logger.info(`Test Engine service listening on port ${port}`);
